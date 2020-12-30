@@ -76,22 +76,32 @@ class modelNameForm(ModelForm):
         fields = '__all__'
 "
 
-admin_text="
+admin_py="
 from django.contrib import admin
 from .models import testModel
 
 admin.site.register(testModel)
 "
 
-# set up venv
-echo -e "\n${bold}setting up a virtual environment${normal}"
-cp -R ~/dev/tyto/python3-venv/ ~/dev/personal-python3-venv    #replace with maske venv
-source personal-python3-venv/bin/activate
+urls_py="
+from django.contrib import admin
+from django.urls import path
+#from $modelName.views import list_view             #cannot seem to get this working
 
-# check django version
-echo -e "\n${bold}You are running django version:{normal}"
-python3 -m pip install -U Django
-python3 -m django --version
+urlpatterns = [
+    #path('', list_view),
+    path('admin/', admin.site.urls),
+]
+"
+
+# set up venv
+python3 -m venv django-venv
+source django-venv/bin/activate
+python3 -m pip install --upgrade pip
+
+# List and install requirements
+echo -e "Django~=3.1.4" > requirements.txt
+pip install -r requirements.txt
 
 # create app and remove previous version
 echo -e "\n${bold}creating an app called $appName${normal}"
@@ -105,7 +115,6 @@ python3 manage.py startapp $modelName
 echo -e "$models_py" > ~/dev/$appName/$modelName/models.py
 
 # add app to installed apps
-echo -e "\n${bold}installing the model${normal}"
 installed_apps="INSTALLED_APPS = [\n    '${appName}',"
 sed -i "s/^INSTALLED_APPS.*/${installed_apps}/" ~/dev/$appName/$appName/settings.py
 
@@ -114,7 +123,10 @@ python3 manage.py makemigrations $appName
 python3 manage.py migrate
 
 # Add a default view
-echo -e "$view_text" > ~/dev/$appName/$modelName/views.py
+echo -e "$views_py" > ~/dev/$appName/$modelName/views.py
+
+# Map URLS
+echo -e "$urls_py" > ~/dev/$appName/$appName/urls.py
 
 # Add a form
 echo -e "$forms_py" > ~/dev/$appName/$modelName/forms.py
@@ -124,10 +136,11 @@ allowed_hosts="ALLOWED_HOSTS = ['andrewmcloughlin.pythonanywhere.com','127.0.0.1
 sed -i "s/^ALLOWED_HOSTS.*/${allowed_hosts}/" ~/dev/$appName/$appName/settings.py
 
 # add model to admin interface   (not working)
-echo -e "$admin_text" > ~/dev/$appName/$modelName/admin.py
+echo -e "$admin_py" > ~/dev/$appName/$modelName/admin.py
+
+tree -L 3
 
 # Create superuser; TODO Give superuser more permissions
-echo -e "\n${bold}create superuser${normal}"
 python3 manage.py createsuperuser
 
 # make migrations
