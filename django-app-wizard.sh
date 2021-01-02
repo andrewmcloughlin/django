@@ -9,7 +9,6 @@ helpFunction()
    echo "Usage: $0 -a parameterA -b parameterB -c parameterC"
    echo -e "\t-a The name of the app or project eg. 'ToDoList'"
    echo -e "\t-b The name of the first model eg 'Item'"
-#    echo -e "\t-c Description of what is parameterC"
    exit 1 # Exit script after printing help
 }
 
@@ -31,12 +30,24 @@ fi
 
 # Begin script if all parameters are correct
 
+requirements="
+Django~=3.1.4
+Pillow
+"
+
 models_py="
 from django.db import models
 
 class $modelName(models.Model):
+    id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=200)
     description = models.CharField(max_length=4000)
+    image = models.ImageField(
+        null=True, 
+        blank=True, 
+        upload_to='', 
+        default='logo.png'
+        )
     def __str__(self):
          return self.title
 "
@@ -86,16 +97,23 @@ admin.site.register(testModel)
 urls_py="
 from django.contrib import admin
 from django.urls import path
-from $appName.views import list_view, add
+from $appName.views import list_view, add 
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from django.conf import settings
+from django.conf.urls.static import static
+
 
 urlpatterns = [
-    path('', list_view),
-    path('add/', add),
+    path('', list_view, name ='list'),
+    path('add/', add, name = 'add'),
     path('admin/', admin.site.urls),
-]
+]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+urlpatterns += staticfiles_urlpatterns()
 "
 
 base_html="
+{% load static %}
 <html>
     <head>
         <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons'>
@@ -107,10 +125,12 @@ base_html="
     <body>
         <ul class='nav nav-tabs navbar-dark box-shadow'>
             <li class='nav-item'>
-                <a class='nav-link' href='/'>$appName</a>
+                <a class='nav-link' href='/'>
+                     <img src='{% static 'logo.png' %}' height='20'>
+                </a>
             </li>
             <li class='nav-item'>
-                <a class='nav-link' href='/'>See all</a>
+                <a class='nav-link' href='/'>Home</a>
             </li>
             <li class='nav-item'>
                 <a class='nav-link' href='/add'>add</a>
@@ -137,38 +157,40 @@ index_html="
 <div class='col s1 m1'>
     <div class='card mb-4 box-shadow'>
         <div class='card-body'>
+            <img src='{{object.image.url}}' class='card-img-top'>
             <h2 class='card-text'>{{object}}</h2>
             <p class='card-text'>Title: {{object.title}}</p>
             <p class='card-text'>Description: {{object.description}}</p>
             <div class='d-flex justify-content-between align-items-center'>
                 <div class='btn-group'>
-                    <button type='button' class='btn btn-sm btn-outline-secondary'>View</button>
-                    <button type='button' class='btn btn-sm btn-outline-secondary'>Edit</button>
+                    <button type='button' class='btn btn-sm btn-outline-primary'>Edit</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 {% endfor %}
-<a class='btn btn-lg btn-primary' href='/add'><i class='material-icons'>add</i></a>
+<a href='/add'>
+    <button type='button' class='btn btn-lg btn-primary' >
+        <i class='material-icons'>add
+        </i> Add
+    </button>
+</a>
 {% endblock %}
 "
 
 add_html="
 {% extends '$appName/base.html' %}
 {% block content %}
-<form action='' method='post'>
+<form action='' method='POST' enctype='multipart/form-data'>
     <div class='form-group'>
         {% csrf_token %}
-        {{form}}
+        {{form.as_p}}
     </div>
-    <input type='submit' value='submit and return' class='btn btn-lg btn-primary'>
     <input type='submit' value='submit and add another' class='btn btn-lg btn-secondary'>
 </form>
 {% endblock content %}
 "
-
-
 
 # set up venv
 python3 -m venv django-venv
@@ -176,7 +198,7 @@ source django-venv/bin/activate
 python3 -m pip install --upgrade pip
 
 # List and install requirements
-echo -e "Django~=3.1.4" > requirements.txt
+echo -e "$requirements" > requirements.txt
 pip install -r requirements.txt
 
 # create app and remove previous version
@@ -210,6 +232,32 @@ echo -e "$forms_py" > ~/dev/$appName/$appName/forms.py
 # allow hosting locally and on pythonanywhere
 allowed_hosts="ALLOWED_HOSTS = ['andrewmcloughlin.pythonanywhere.com','127.0.0.1']"
 sed -i "s/^ALLOWED_HOSTS.*/${allowed_hosts}/" ~/dev/$appName/$appName/settings.py
+
+# append static files settings to settings.py
+staticfiles_dirs="
+
+import os
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, 'assets'),
+)
+"
+echo -e "$staticfiles_dirs" >> ~/dev/$appName/$appName/settings.py
+
+
+# append media root settings to settings.py
+media_root="
+
+MEDIA_ROOT = (
+    os.path.join(BASE_DIR, 'assets')
+)
+"
+echo -e "$media_root" >> ~/dev/$appName/$appName/settings.py
+
+
+# make an assets dir for static files
+cd ~/dev/$appName
+git clone https://github.com/andrewmcloughlin/assets
+cd ~/dev/$appName
 
 # add model to admin interface
 echo -e "$admin_py" > ~/dev/$appName/$appName/admin.py
