@@ -11,14 +11,14 @@ helpFunction()
 while getopts "a:b:" opt
 do
    case "$opt" in
-      a ) appName="$OPTARG" ;;
-      b ) modelName="$OPTARG" ;;
+      a ) project="$OPTARG" ;;
+      b ) app="$OPTARG" ;;
       ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
 
 # Print helpFunction in case parameters are empty
-if [ -z "$appName" ] || [ -z "$modelName" ] 
+if [ -z "$project" ] || [ -z "$app" ] 
 then
    echo "Some or all of the parameters are empty";
    helpFunction
@@ -29,15 +29,15 @@ fi
 models_py="
 from django.db import models
 
-class $modelName(models.Model):
+class $app(models.Model):
     id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=200)
     description = models.CharField(max_length=4000)
     image = models.ImageField(
         null=True, 
         blank=True, 
-        upload_to='assets', 
-        default='logo.png'
+        upload_to='static/images', 
+        default='static/images/placeholder.png'
         )
     def __str__(self):
          return self.title
@@ -46,15 +46,15 @@ views_py="
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.template import loader
-from .models import $modelName
+from .models import $app
 from .forms import mainForm
 
 def list_view(request):
-    all_objects = $modelName.objects.all()
+    all_objects = $app.objects.all()
     context = {
         'all_objects': all_objects
     }
-    return render(request, '$appName/index.html', context)
+    return render(request, '$app/index.html', context)
 
 def add(request):
     form = mainForm()
@@ -67,36 +67,36 @@ def add(request):
     context = {
         'form': form
     }
-    return render(request, '$appName/add.html', context)
+    return render(request, '$app/add.html', context)
 
 def update(request, pk):
     form = mainForm()
     context = {
         'form': form
     }
-    return render(request, '$appName/add.html', context)
+    return render(request, '$app/add.html', context)
 "
 forms_py="
 from django.forms import ModelForm
-from .models import $modelName
+from .models import $app
 
 class mainForm(ModelForm):
     class Meta:
-        model = $modelName
+        model = $app
         fields = '__all__'
 "
 
 admin_py="
 from django.contrib import admin
-from .models import $modelName
+from .models import $app
 
-admin.site.register($modelName)
+admin.site.register($app)
 "
 
 urls_py="
 from django.contrib import admin
 from django.urls import path
-from $appName.views import *
+from $app.views import *
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.conf import settings
 from django.conf.urls.static import static
@@ -106,11 +106,21 @@ urlpatterns = [
     path('', list_view, name ='home'),
     path('home/', list_view, name ='home'),
     path('add/', add, name = 'add'),
-    path('admin/', admin.site.urls),
-    path('u<int:id>/', update, name = 'update'),
+    path('add', add, name = 'add'),
+    path('<int:id>/', update, name = 'update'),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += staticfiles_urlpatterns()
+"
+
+project_urls_py="
+from django.contrib import admin
+from django.urls import include, path
+
+urlpatterns = [
+    path('$app/', include('$app.urls')),
+    path('admin/', admin.site.urls),
+]
 "
 
 base_html="
@@ -119,22 +129,23 @@ base_html="
     <head>
         <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons'>
         <link rel='stylesheet' href='https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css' integrity='sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX' crossorigin='anonymous'>
+        <link rel='shortcut icon' type='image/png' href='{% static 'images/favicon.ico' %}'/>
         <title>
-            $appName
+            $project
         </title>
     </head>
     <body>
         <ul class='nav nav-tabs navbar-dark box-shadow'>
             <li class='nav-item'>
-                <a class='nav-link' href='/'>
-                     <img src='{% static 'logo.png' %}' height='20'>
+                <a class='nav-link' href='/$app'>
+                     <img src='{% static 'images\logo.png' %}' height='20'>
                 </a>
             </li>
             <li class='nav-item'>
-                <a class='nav-link' href='/'>Home</a>
+                <a class='nav-link' href='/$app'>Home</a>
             </li>
             <li class='nav-item'>
-                <a class='nav-link' href='/add'>add</a>
+                <a class='nav-link' href='/$app/add/'>add</a>
             </li>
             <li class='nav-item'>
                 <a class='nav-link' href='/admin'>admin</a>
@@ -151,14 +162,14 @@ base_html="
 "
 
 index_html="
-{% extends '$appName/base.html' %}
+{% extends '$app/base.html' %}
 {% load static %}
 {% block content %}
 {% for object in all_objects %}
 <div class='col s1 m1'>
     <div class='card mb-4 box-shadow'>
         <div class='card-body'>
-            <img src='{{object.image.url}}' class='card-img-top' height=50>
+            <img src='{{object.image.url}}' class='card-img-top'>
             <h2 class='card-text'>{{object}}</h2>
             <p class='card-text'>Title: {{object.title}}</p>
             <p class='card-text'>Description: {{object.description}}</p>
@@ -173,7 +184,7 @@ index_html="
     </div>
 </div>
 {% endfor %}
-<a href='/add'>
+<a href='/App/add'>
     <button type='button' class='btn btn-lg btn-primary' >
         <i class='material-icons'>add
         </i> Add
@@ -183,7 +194,7 @@ index_html="
 "
 
 add_html="
-{% extends '$appName/base.html' %}
+{% extends '$app/base.html' %}
 {% block content %}
 <form action='' method='POST' enctype='multipart/form-data'>
     <div class='form-group'>
@@ -198,14 +209,17 @@ add_html="
 settings_py="
 
 import os
+
 STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'assets'),
+    os.path.join(BASE_DIR, 'static'),
 )
 
 MEDIA_ROOT = (
-    os.path.join(BASE_DIR, 'assets')
+    os.path.join(BASE_DIR, 'static')
 )
 
+
+STATIC_ROOT = '$project/static'
 "
 
 # set up venv and requirements
@@ -214,44 +228,48 @@ source django-venv/bin/activate
 python3 -m pip install --upgrade pip
 pip install -r requirements.txt
 
-# create app and remove previous version
+# create project and remove previous version
 cd ~/dev
-rm -rf $appName
-django-admin startproject $appName
+rm -rf $project
+django-admin startproject $project
 
-# startapp and create model
-cd $appName
-echo -e "$models_py" > ~/dev/$appName/$appName/models.py
+# startapp 
+cd $project
+django-admin startapp $app
+echo -e "$models_py" > ~/dev/$project/$app/models.py
 
 # add app to installed apps
-installed_apps="INSTALLED_APPS = [\n    '${appName}',"
-sed -i "s/^INSTALLED_APPS.*/${installed_apps}/" ~/dev/$appName/$appName/settings.py
+installed_apps="INSTALLED_APPS = [\n    '${project}',\n    '${app}',"
+sed -i "s/^INSTALLED_APPS.*/${installed_apps}/" ~/dev/$project/$project/settings.py
 
 # make migrations
-python3 manage.py makemigrations $appName
+cd ~/dev/$project
+python3 manage.py makemigrations $app
 python3 manage.py migrate
 
-# Add views.py, urls.py and forms.py
-echo -e "$views_py" > ~/dev/$appName/$appName/views.py
-echo -e "$urls_py" > ~/dev/$appName/$appName/urls.py
-echo -e "$forms_py" > ~/dev/$appName/$appName/forms.py
+# # Add views.py, urls.py and forms.py
+echo -e "$views_py" > ~/dev/$project/$app/views.py
+echo -e "$urls_py"  > ~/dev/$project/$app/urls.py
+echo -e "$project_urls_py"  > ~/dev/$project/$project/urls.py
+echo -e "$forms_py" > ~/dev/$project/$app/forms.py
 
-# append to settings.py
-echo -e "$settings_py" >> ~/dev/$appName/$appName/settings.py
+# # append to settings.py
+echo -e "$settings_py" >> ~/dev/$project/$project/settings.py
 
 # allow hosting locally and on pythonanywhere
 allowed_hosts="ALLOWED_HOSTS = ['andrewmcloughlin.pythonanywhere.com','127.0.0.1']"
-sed -i "s/^ALLOWED_HOSTS.*/${allowed_hosts}/" ~/dev/$appName/$appName/settings.py
+sed -i "s/^ALLOWED_HOSTS.*/${allowed_hosts}/" ~/dev/$project/$project/settings.py
 
 # make an assets dir for static files
-cd ~/dev/$appName
-git clone https://github.com/andrewmcloughlin/assets
-cd ~/dev/$appName
+mkdir ~/dev/$project/static
+mkdir ~/dev/$project/static/images
+cp ~/dev/AppMaker/logo.png ~/dev/$project/static/images/logo.png
+cp ~/dev/AppMaker/favicon.ico ~/dev/$project/static/images/favicon.ico
+cp ~/dev/AppMaker/placeholder.png ~/dev/$project/static/images/placeholder.png
+cd ~/dev/$project
 
 # add model to admin interface
-echo -e "$admin_py" > ~/dev/$appName/$appName/admin.py
-
-tree -L 2
+echo -e "$admin_py" > ~/dev/$project/$app/admin.py
 
 # Create superuser
 DJANGO_SUPERUSER_PASSWORD=maclin1527 \
@@ -260,20 +278,26 @@ DJANGO_SUPERUSER_EMAIL=my_user@domain.com \
 ./manage.py createsuperuser \
 --no-input --username andrew
 
+# collect static files
+python3 manage.py collectstatic
+
 # make migrations
-python3 manage.py makemigrations $appName
+python3 manage.py makemigrations $app
 python3 manage.py migrate
 
 # html templates
-cd ~/dev/$appName/$appName
+cd ~/dev/$project/$app
 mkdir templates
 cd templates
-mkdir $appName
-cd $appName
-echo -e "$base_html" > ~/dev/$appName/$appName/templates/$appName/base.html
-echo -e "$index_html" > ~/dev/$appName/$appName/templates/$appName/index.html
-echo -e "$add_html" > ~/dev/$appName/$appName/templates/$appName/add.html
+mkdir $app
+cd $app
+echo -e "$base_html"  > ~/dev/$project/$app/templates/$app/base.html
+echo -e "$index_html" > ~/dev/$project/$app/templates/$app/index.html
+echo -e "$add_html"   > ~/dev/$project/$app/templates/$app/add.html
+
+cd ~/dev/$project
+tree -L 2
 
 #runserver
-cd ~/dev/$appName
+cd ~/dev/$project
 python3 manage.py runserver
